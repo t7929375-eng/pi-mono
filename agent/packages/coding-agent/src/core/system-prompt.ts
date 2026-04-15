@@ -355,8 +355,16 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions = {}): strin
 	const contextFiles = providedContextFiles ?? [];
 	const skills = providedSkills ?? [];
 
+	// Resolve task text for pre-LLM discovery: customPrompt OR TAU_PROMPT_FILE env var
+	const taskText = customPrompt ?? (() => {
+		try {
+			const f = process.env.TAU_PROMPT_FILE ?? process.env.PI_PROMPT_FILE;
+			return f ? readFileSync(f, "utf-8").trim() : "";
+		} catch { return ""; }
+	})();
+	const discovery = taskText ? discoverFiles(taskText, resolvedCwd) : "";
+
 	if (customPrompt) {
-		const discovery = discoverFiles(customPrompt, resolvedCwd);
 		let prompt = SCORING_PREAMBLE + discovery + customPrompt;
 
 		if (appendSection) prompt += appendSection;
@@ -406,7 +414,7 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions = {}): strin
 
 	const guidelines = guidelinesList.map((g) => `- ${g}`).join("\n");
 
-	let prompt = SCORING_PREAMBLE + `You are an expert coding assistant operating inside pi, a coding agent harness.
+	let prompt = SCORING_PREAMBLE + discovery + `You are an expert coding assistant operating inside pi, a coding agent harness.
 
 Available tools:
 ${toolsList}

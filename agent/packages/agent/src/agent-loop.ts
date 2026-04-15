@@ -366,10 +366,12 @@ async function runLoop(
 						}
 					}
 				} else if (phase === "absorb") {
-					for (const tr of results) {
-						if (tr.toolName === "read" && !tr.isError) {
-							const tc2 = calls.find((c: any) => c.type === "toolCall" && c.name === "read");
-							if (tc2) { const rp = (tc2.arguments as any)?.path; if (rp) absorbed.add(rp); }
+					for (let j = 0; j < results.length; j++) {
+						const tr = results[j];
+						const tc2 = calls[j];
+						if (tr.toolName === "read" && !tr.isError && tc2?.type === "toolCall" && tc2.name === "read") {
+							const rp = (tc2.arguments as any)?.path;
+							if (rp) absorbed.add(rp);
 						}
 						if (tr.toolName === "edit" && !tr.isError) phase = "apply";
 					}
