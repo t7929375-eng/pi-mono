@@ -123,7 +123,10 @@ function esc(s: string): string { return s.replace(/[\\"`$]/g, "\\$&"); }
 // ─── Pre-LLM file discovery ───────────────────────────────────────────
 
 const SOURCE_GLOBS =
-	'--include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" --include="*.mjs" --include="*.cjs" --include="*.py" --include="*.go" --include="*.rs" --include="*.java" --include="*.kt" --include="*.rb" --include="*.cs" --include="*.cpp" --include="*.c" --include="*.h" --include="*.hpp" --include="*.vue" --include="*.svelte" --include="*.css" --include="*.scss" --include="*.html" --include="*.json" --include="*.yaml" --include="*.yml" --include="*.toml" --include="*.md" --include="*.scala" --include="*.dart" --include="*.sh"';
+	'--include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" --include="*.mjs" --include="*.cjs" --include="*.py" --include="*.go" --include="*.rs" --include="*.java" --include="*.kt" --include="*.rb" --include="*.cs" --include="*.cpp" --include="*.c" --include="*.h" --include="*.hpp" --include="*.vue" --include="*.svelte" --include="*.css" --include="*.scss" --include="*.html" --include="*.yaml" --include="*.yml" --include="*.toml" --include="*.scala" --include="*.dart" --include="*.sh"';
+
+// Files to deprioritize in ranking (noise files that match keywords but aren't edit targets)
+const NOISE_FILES = /(?:CHANGELOG|package-lock|\.min\.js|\.d\.ts|\.map|LICENSE|README)(?:\.|$)/i;
 
 const DIR_EXCLUDES = "grep -v node_modules | grep -v '/\\.git/' | grep -v '/dist/' | grep -v '/build/' | grep -v '/out/' | grep -v '/\\.next/' | grep -v '/target/'";
 
@@ -134,9 +137,38 @@ function discoverFiles(taskText: string, cwd: string): string {
 
 		if (keywords.length === 0 && explicitPaths.length === 0) return "";
 
-		// Grep each keyword to find relevant files
+		// Grep keywords — batch into a single regex when possible for speed
 		const hits = new Map<string, Set<string>>();
-		for (const kw of keywords) {
+		const batchable = keywords.filter(k => /^[\w.-]+$/.test(k));
+		const unbatchable = keywords.filter(k => !/^[\w.-]+$/.test(k));
+
+		// Batch grep: combine simple keywords into one regex with alternation
+		if (batchable.length > 0) {
+			try {
+				const pattern = batchable.map(k => esc(k)).join("|");
+				const out = execSync(
+					`grep -rlE "${pattern}" ${SOURCE_GLOBS} . 2>/dev/null | ${DIR_EXCLUDES} | head -30`,
+					{ cwd, timeout: 4000, encoding: "utf-8", maxBuffer: 2 * 1024 * 1024 },
+				).trim();
+				if (out) {
+					for (const file of out.split("\n")) {
+						const f = file.trim().replace(/^\.\//, "");
+						if (!f) continue;
+						// Determine which keywords this file matches
+						for (const kw of batchable) {
+							try {
+								execSync(`grep -qlF "${esc(kw)}" "${f}" 2>/dev/null`, { cwd, timeout: 500, encoding: "utf-8" });
+								if (!hits.has(f)) hits.set(f, new Set());
+								hits.get(f)!.add(kw);
+							} catch {}
+						}
+					}
+				}
+			} catch {}
+		}
+
+		// Individual grep for keywords with special chars
+		for (const kw of unbatchable) {
 			try {
 				const out = execSync(
 					`grep -rlF "${esc(kw)}" ${SOURCE_GLOBS} . 2>/dev/null | ${DIR_EXCLUDES} | head -12`,
@@ -164,7 +196,15 @@ function discoverFiles(taskText: string, cwd: string): string {
 
 		if (hits.size === 0 && verified.length === 0) return "";
 
-		const ranked = [...hits.entries()].sort((a, b) => b[1].size - a[1].size).slice(0, 15);
+		// Rank: source files first, noise files last
+		const ranked = [...hits.entries()]
+			.sort((a, b) => {
+				const aNoise = NOISE_FILES.test(a[0]) ? 1 : 0;
+				const bNoise = NOISE_FILES.test(b[0]) ? 1 : 0;
+				if (aNoise !== bNoise) return aNoise - bNoise;
+				return b[1].size - a[1].size;
+			})
+			.slice(0, 15);
 		const out: string[] = [];
 
 		if (verified.length > 0) {
@@ -176,8 +216,10 @@ function discoverFiles(taskText: string, cwd: string): string {
 			for (const [f, kws] of ranked) out.push(`  - ${f} (${[...kws].slice(0, 4).join(", ")})`);
 		}
 
-		// Detect style of the top file
-		const topFile = verified[0] || ranked[0]?.[0];
+		// Detect style of the top SOURCE file (skip .md, .json, .yml)
+		const topFile = verified.find(f => /\.(ts|tsx|js|jsx|py|go|rs|java|rb|cs|cpp|c|vue|svelte)$/.test(f))
+			|| ranked.find(([f]) => /\.(ts|tsx|js|jsx|py|go|rs|java|rb|cs|cpp|c|vue|svelte)$/.test(f))?.[0]
+			|| verified[0] || ranked[0]?.[0];
 		if (topFile) {
 			const style = detectStyle(cwd, topFile);
 			if (style) {
