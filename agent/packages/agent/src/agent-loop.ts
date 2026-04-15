@@ -135,11 +135,12 @@ const EDIT_FAIL_MAX = 2;       // per-file edit failure ceiling
 const EMPTY_TURN_MAX = 2;      // retries when model outputs no tool calls
 const MAX_COVERAGE_NUDGES = 2; // forced coverage re-prompts
 
-// Time thresholds (ms) — hybrid of TAO666 (aggressive) and king (layered)
-const T_WARN    = 8_000;       // first nudge: "make an edit"
-const T_URGENT  = 18_000;      // second nudge: "time running out"
-const T_LATE    = 50_000;      // final nudge: "edit NOW"
-const T_EXIT    = 170_000;     // graceful hard exit
+// Time thresholds (ms) — data-driven from 305 duels analysis
+// Winners avg 5.2s/round, losers 8.7s. Speed > quality.
+const T_WARN    = 6_000;       // P75 of round time — nudge early
+const T_URGENT  = 12_000;      // P85 — most duels done by now
+const T_LATE    = 25_000;      // 99.6% of duels avg under 30s/round
+const T_EXIT    = 120_000;     // save partial diff, don't burn 170s on nothing
 
 async function runLoop(
 	ctx: AgentContext,

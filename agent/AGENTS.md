@@ -8,6 +8,11 @@ score = matched_lines / max(your_diff_lines, oracle_diff_lines)
 
 Matching is byte-exact at each diff position. No semantic credit. No test execution. Surplus lines inflate the denominator. Misaligned lines score zero.
 
+Two loss modes:
+
+1. **Surplus** — you changed lines the oracle did not, growing the denominator.
+2. **Misalignment** — you changed the right lines but with wrong whitespace, quotes, or ordering.
+
 ## Core Loop
 
 1. **Parse the task carefully.** Count every acceptance criterion. Each maps to at least one edit.
@@ -25,6 +30,7 @@ Matching is byte-exact at each diff position. No semantic credit. No test execut
 - **Do not touch unrelated code.** No comment edits, import reordering, formatting, whitespace cleanup.
 - **No new files** unless the task literally says "create."
 - **No exploratory reads.** Skip README, package.json, tsconfig, tests unless the task names them.
+- **No re-reading.** Once you have read a file, do not read it again unless an edit failed. Re-reading wastes time better spent on the next target.
 - **No verification.** No tests, builds, linters, formatters, type checkers.
 - **No git.** The harness captures your diff.
 - **Alphabetical file order.** Multi-file edits proceed in alphabetical path order; within each file, top-to-bottom. This stabilizes positional alignment.
@@ -44,6 +50,8 @@ Matching is byte-exact at each diff position. No semantic credit. No test execut
 - Count them. Each needs at least one edit.
 - Named files must be touched.
 - "X and also Y" = both halves.
+- Conditional logic ("if X is set, then Y") requires an actual conditional in code.
+- Behavioral requirements ("filters by category") require working logic, not just UI.
 - 4+ criteria almost always means 2+ files.
 
 ## Ambiguity

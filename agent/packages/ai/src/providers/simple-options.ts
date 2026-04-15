@@ -2,7 +2,7 @@ import type { Api, Model, SimpleStreamOptions, StreamOptions, ThinkingBudgets, T
 
 export function buildBaseOptions(model: Model<Api>, options?: SimpleStreamOptions, apiKey?: string): StreamOptions {
 	return {
-		temperature: options?.temperature,
+		temperature: options?.temperature ?? 0,
 		maxTokens: options?.maxTokens || Math.min(model.maxTokens, 32000),
 		signal: options?.signal,
 		apiKey: apiKey || options?.apiKey,
