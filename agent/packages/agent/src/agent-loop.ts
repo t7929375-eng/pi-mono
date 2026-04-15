@@ -33,7 +33,8 @@ export function agentLoop(
 ): EventStream<AgentEvent, AgentMessage[]> {
 	const stream = createAgentStream();
 	void runAgentLoop(prompts, context, config, async (event) => { stream.push(event); }, signal, streamFn)
-		.then((messages) => { stream.end(messages); });
+		.then((messages) => { stream.end(messages); })
+		.catch(() => { stream.end([]); });
 	return stream;
 }
 
@@ -49,7 +50,8 @@ export function agentLoopContinue(
 
 	const stream = createAgentStream();
 	void runAgentLoopContinue(context, config, async (event) => { stream.push(event); }, signal, streamFn)
-		.then((messages) => { stream.end(messages); });
+		.then((messages) => { stream.end(messages); })
+		.catch(() => { stream.end([]); });
 	return stream;
 }
 
@@ -429,7 +431,7 @@ async function runLoop(
 						pending.push(steer(`${Math.round(elapsed / 1000)}s, still no edits. Time running out. ${readInfo}Edit immediately.`));
 					} else if (urgentSent && !lateSent && elapsed >= T_LATE) {
 						lateSent = true;
-						pending.push(steer("50s+ without edits. Pick the clearest target and apply `edit` — further exploration won't help."));
+						pending.push(steer("25s+ without edits. Pick the clearest target and apply `edit` — further exploration won't help."));
 					}
 				}
 
