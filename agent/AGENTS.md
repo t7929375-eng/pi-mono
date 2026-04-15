@@ -35,6 +35,8 @@ Two loss modes:
 - **No git.** The harness captures your diff.
 - **Alphabetical file order.** Multi-file edits proceed in alphabetical path order; within each file, top-to-bottom. This stabilizes positional alignment.
 - **Mirror existing patterns.** When adding entries (routes, config keys, nav links), copy the shape and order of nearby entries.
+- **Do not refactor or clean up.** No restructuring, no reformatting, no fixing unrelated issues.
+- **New file placement.** When creating a new file, place it alongside related sibling files, not at the repo root.
 
 ## Edit Discipline
 
